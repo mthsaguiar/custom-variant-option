@@ -1,30 +1,49 @@
 console.log('Hello from custom variant!');
 
-document.querySelectorAll('.product-custom-selection a').forEach((el) => {
-  el.addEventListener('click', (e) => {
-    e.preventDefault();
-    console.log('clicked', el.dataset.option);
-    let newUrl;
-    switch (el.dataset.option) {
-      case 'white':
-        newUrl = '/products/oakley-sandal-cyan';
-        break;
-      case 'red':
-        newUrl = '/products/oakley-sandal-gold';
-        break;
-      default:
-        newUrl = '/products/oakley-sandal-green';
-    }
-    window.history.pushState(null, '', newUrl);
-    loadProduct(newUrl);
+// Initialize custom variant links
+function initializeCustomVariantLinks() {
+  document.querySelectorAll('.product-custom-selection a').forEach((el) => {
+    el.addEventListener('click', handleCustomVariantClick);
   });
-});
+}
+
+function handleCustomVariantClick(e) {
+  e.preventDefault();
+  const el = e.currentTarget;
+  console.log('clicked', el.dataset.option);
+  let newUrl;
+  switch (el.dataset.option) {
+    case 'white':
+      newUrl = '/products/oakley-sandal-cyan';
+      break;
+    case 'red':
+      newUrl = '/products/oakley-sandal-gold';
+      break;
+    default:
+      newUrl = '/products/oakley-sandal-green';
+  }
+  const selectedOptions = captureSelectedOptions();
+  console.log('Captured options before change:', selectedOptions);
+  window.history.pushState({ selectedOptions }, '', newUrl);
+  loadProduct(newUrl, selectedOptions);
+}
 
 window.addEventListener('popstate', (event) => {
-  loadProduct(window.location.pathname);
+  const selectedOptions = event.state ? event.state.selectedOptions : {};
+  console.log('Captured options from popstate:', selectedOptions);
+  loadProduct(window.location.pathname, selectedOptions);
 });
 
-function loadProduct(url) {
+function captureSelectedOptions() {
+  const selectedOptions = {};
+  document.querySelectorAll('.product-form__input--pill input[type="radio"]:checked').forEach((input) => {
+    selectedOptions[input.name] = input.value;
+  });
+  console.log('Captured selected options:', selectedOptions);
+  return selectedOptions;
+}
+
+function loadProduct(url, selectedOptions) {
   fetch(url)
     .then((response) => response.text())
     .then((html) => {
@@ -35,38 +54,36 @@ function loadProduct(url) {
       if (newProductSection && currentProductSection) {
         currentProductSection.innerHTML = newProductSection.innerHTML;
 
+        // Reapply selected options to the new product
+        document.querySelectorAll('.product-form__input--pill input[type="radio"]').forEach((input) => {
+          if (selectedOptions[input.name] && selectedOptions[input.name] === input.value) {
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+
+        // Update the URL to reflect the selected variant
+        updateURLWithSelectedVariant();
+
         // Reinitialize any scripts needed for the new content
         reinitializeScripts();
+      } else {
+        console.error('Product section not found in the fetched document or the current document.');
       }
     })
     .catch((error) => console.error('Error loading product:', error));
 }
 
-function reinitializeScripts() {
-  // Add any code here to reinitialize scripts for the new product content
-  console.log('Reinitializing scripts');
+function updateURLWithSelectedVariant() {
+  const variantId = document.querySelector('input[name="id"]').value;
+  const url = new URL(window.location);
+  url.searchParams.set('variant', variantId);
+  window.history.replaceState({ selectedOptions: captureSelectedOptions() }, '', url);
 }
 
 function reinitializeScripts() {
-  // Reinitialize any event listeners or JavaScript components
-  document.querySelectorAll('.product-custom-selection a').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      console.log('clicked', el.dataset.option);
-      let newUrl;
-      switch (el.dataset.option) {
-        case 'white':
-          newUrl = '/products/oakley-sandal-cyan';
-          break;
-        case 'red':
-          newUrl = '/products/oakley-sandal-gold';
-          break;
-        default:
-          newUrl = '/products/oakley-sandal-green';
-      }
-      window.history.pushState(null, '', newUrl);
-      loadProduct(newUrl);
-    });
-  });
-  console.log('Reinitializing scripts');
+  initializeCustomVariantLinks();
 }
+
+// Initial setup
+initializeCustomVariantLinks();
